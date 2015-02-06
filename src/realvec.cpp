@@ -814,8 +814,8 @@ void
 realvec::dump()
 {
 	for(int i =0 ; i< size_ ; i++)
-//		MRSMSG(data_[i] << " ") ;
-//	MRSMSG(endl);
+		cout << data_[i] << " " ;
+	cout << endl;
 }
 
 bool

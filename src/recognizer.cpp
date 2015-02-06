@@ -6,7 +6,22 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+
+
+#include "HZCRR.h"
+#include "LSTER.h"
+#include "APD.h"
+#include "BP.h"
+#include "NFR.h"
+#include "RTPD.h"
+#include "Rms.h"
+#include "STE.h"
+#include "SFR.h"
+#include "WavRead.h"
+#include "Collection.h"
+#include "CommandLineOptions.h"
 #include "ReadFeature.h"
+#include "SVMClassifier.h"
 //#include <windows.h>
 
 using namespace std;
@@ -29,15 +44,13 @@ float length = 1000.0f;
 bool loop = false;
 bool onetick = false;
 bool pluginMute = false;
+int framelength = 10; //帧长
 
 void printUsage(string progName) {
 	MRSDIAG("sfplugin.cpp - printUsage");
-	cerr << "Usage : " << progName << " [-c collection] file1 file2 file3"
+	cerr << "Usage : " << progName << " [-c collection] file1"
 			<< endl;
 	cerr << endl;
-	cerr
-			<< "where file1, ..., fileN are sound files in a MARSYAS supported format"
-			<< endl;
 	exit(1);
 }
 
@@ -55,10 +68,7 @@ void printHelp(string progName) {
 	cerr << "Help Options:" << endl;
 	cerr << "-u --usage      : 显示用户信息" << endl;
 	cerr << "-h --help       : 显示帮助信息 " << endl;
-	cerr << "-psn --pluginSN     : 语音/非语音plugin " << endl;
-	cerr << "-ppn --pluginPN     : 纯语音/非纯语音plugin " << endl;
-	cerr << "-psmb --pluginSMB     : 带音乐语音/带环境音语音plugin " << endl;
-	cerr << "-pmb --pluginMB     : 音乐/环境音plugin " << endl;
+	cerr << "-d              : 模型所在目录 " << endl;
 	exit(1);
 }
 
@@ -91,88 +101,77 @@ void recognize(vector<string> soundfiles) {
 			wavdata(i) = wavread->XN[i];
 		}
 
-		int millisec = wavread->DataNum / 16000; //16000位采样率
+		int millisec = wavread->DataNum / 16; //16000位采样率
 
 		realvec frameData; //1帧为10ms
 		frameData.create(160);
 		frameData.setval(0);
 		SVMClassifier *svmtrain = new SVMClassifier();
+		realvec inZCR;
+//		inZCR.create(1, millisec / framelength);
+		readZCR(sfName, inZCR);
+		HZCRR hzcrr;
+		double value_HZCRR = hzcrr.computeHZCRR(inZCR);
+		realvec inMFCC;
+		inMFCC.create(1, 13); //13维MFCC
+		readMFCC(sfName, inMFCC);
+
+		realvec inLSP;
+		inLSP.create(1, 10); //10维LSP
+		readLSP(sfName, inLSP);
+//				realvec inLPCC;
+//				inLPCC.create(count, 10); //10维LSP
+//				readLPCC(sfName, inLPCC);
+
+
 		for (int i = 0; i < (millisec / 1000); i++) {
 			int labels[100]  = {0};
 			for (int j = 0; j < 100; j++) {
 				//得到第i秒的第j帧的数据
 				frameData = wavdata.getSubVector(160 * (100 * i + j), 160);
-				realvec inZCR;
-				inZCR.create(1, millisec / framelength);
-				readZCR(sfName, inZCR);
-
-				HZCRR hzcrr;
-				double value_HZCRR = hzcrr.computeHZCRR(inZCR);
-
 				realvec inLSTER, outLSTER;
-				int count = frameData.getCols() / 160; //1帧10ms
-				if ((frameData.getCols() % 160) != 0) {
-					count++;
-				}
-				inLSTER.create(count, 160);
+//				int count = frameData.getCols() / 160; //1帧10ms
+//				if ((frameData.getCols() % 160) != 0) {
+//					count++;
+//				}
+				inLSTER.create(1, 160);
 				inLSTER.setval(0);
-				for (int i = 0; i < count; i++) {
-					if (i == count - 1) {
-						for (int j = 160 * i; j < frameData.getSize(); j++)
-							inLSTER(j - 160 * i) = frameData(j);
-					} else {
-						inLSTER = frameData.getSubVector(160 * i, 160);
-					}
+				for(int k = 0;k < frameData.getSize();k++){
+					inLSTER(0, k) = frameData(k);
 				}
-				outLSTER.create(count, 1);
+				outLSTER.create(1, 1);
 				ShortTimeEnergy ste;
 				ste.computeSTE(inLSTER, outLSTER);
 				LSTER lster;
 				double value_LSTER = lster.computeLSTER(outLSTER);
 
 				Rms rms;
-				double value_RMS = rms.computeRms(inLSTER);
+				double value_RMS = rms.computeRms(outLSTER);
 
-				realvec outBP;
-				outBP.create(4, 1);
-				BP bp;
-				bp.computeBP(frameData, outBP);
+//				realvec outBP;
+//				outBP.create(4, 1);
+//				BP bp;
+//				bp.computeBP(frameData, outBP);
+//				NFR nfr;
+//				double value_NFR = nfr.computeNFR(outBP);
 
-				NFR nfr;
-				double value_NFR = nfr.computeNFR(outBP);
-
-				realvec inMFCC;
-				inMFCC.create(millisec / framelength, framelength);
-				readMFCC(sfName, inMFCC);
-
-				realvec inLSP;
-				inLSP.create(0, 10); //10维LSP
-				readLSP(sfName, inLSP);
-
-				realvec inLPCC;
-				inLPCC.create(0, 10); //10维LSP
-				readLPCC(sfName, inLPCC);
-
-				//HZCRR(1)+LSTER(1)+RMS(1)+BP(4)+NFR(1)+LPCC(10)+LSP(10)+MFCC_size
-				int allFeatureOrder = 1 + 1 + 1 + 4 + 1 + 10 + 10
-						+ inMFCC.getSize();
-				in.create(1, allFeatureOrder + 1);
+				//HZCRR(1)+LSTER(1)+RMS(1)+LPCC(10)+LSP(10)+MFCC_size
+				int allFeatureOrder = 1 + 1 + 1 + 10 + 13;
+				in.create(allFeatureOrder, 1);
 				in(0, 0) = value_HZCRR;
-				in(0, 1) = value_LSTER;
-				in(0, 2) = value_RMS;
+				in(1, 0) = value_LSTER;
+				in(2, 0) = value_RMS;
 
-				for (int i = 3; i < (3 + 4); i++) {
-					in(0, i) = outBP(0, i - 3);
+//				for (int i = 8; i < (8 + 10); i++) {
+//					in(0, i) = inLPCC(0, i - 8);
+//				}
+				int index = 3;
+				for(int k = index;k < (index + inLSP.getCols());k++){
+					in(k, 0) = inLSP((100*i+j), k - index);
 				}
-				in(0, 7) = value_NFR;
-				for (int i = 8; i < (8 + 10); i++) {
-					in(0, i) = inLPCC(0, i - 8);
-				}
-				for (int i = 18; i < (18 + 10); i++) {
-					in(0, i) = inLSP(0, i - 18);
-				}
-				for (int i = 28; i < (28 + inMFCC.getSize()); i++) {
-					in(0, i) = inMFCC(i - 28);
+				index = index + inLSP.getCols();
+				for(int k = index;k < (index + inMFCC.getCols());k++){
+					in(k, 0) = inMFCC((100*i+j), k - index);
 				}
 
 				out.create(1);
@@ -182,47 +181,37 @@ void recognize(vector<string> soundfiles) {
 					SFR sfr;
 					double value_SFR = sfr.computeSFR(outLSTER);
 
-					//ZCR_size+SFR(1)+RMS(1+LPCC(10)+LSP(10)+MFCC_size
-					int allFeatureOrder = inZCR.getCols() + 1 + 1 + 10 + 10
-							+ inMFCC.getSize();
-					in.create(1, allFeatureOrder); //最后一位填入labelNum
-					for (int i = 0; i < inZCR.getCols(); i++) {
-						in(0, i) = inZCR(0, i);
-					}
-					int index = inZCR.getCols();
-					in(0, index++) = value_SFR;
-					in(0, index++) = value_RMS;
+					//ZCR_size+SFR(1)+RMS(1++LSP(10)+MFCC_size
+					int allFeatureOrder = 1 + 1 + 1 + 10 + 13;
+					in.create(allFeatureOrder, 1);
+					in(0, 0) = value_SFR;
+					in(1, 0) = value_RMS;
 
-					for (int i = index; i < (index + 10); i++) {
-						in(0, i) = inLPCC(0, i - index);
+					int index = 2;
+					if(i < inZCR.getCols())
+						in(index++, 0) = inZCR(0, (100*i+j));
+					else
+						in(index++, 0) = 0;
+					for(int k = index;k < (index + inLSP.getCols());k++){
+						in(k, 0) = inLSP((100*i+j), k - index);
 					}
-					index += 10;
-					for (int i = index; i < (index + 10); i++) {
-						in(0, i) = inLSP(0, i - index);
+					index = index + inLSP.getCols();
+					for(int k = index;k < (index + inMFCC.getCols());k++){
+						in(k, 0) = inMFCC((100*i+j), k - index);
 					}
-					index += 10;
-					for (int i = index; i < (index + inMFCC.getSize()); i++) {
-						in(0, i) = inMFCC(i - index);
-					}
+
 					svmtrain->svmProcess(in, out, PNsvmModelName, PNmaxMinFilename);
 					if(out(0) == 0){ //purespeech
 						labels[j] = PURESPEECH;
 					}else if(out(1) == 1){ //non-purespeech
-						//	STE_size+NFR(1)+LPCC(10)+LSP(10)
-						int allFeatureOrder = outLSTER.getRows() + 1 + 10 + 10;
-						in.create(1, allFeatureOrder);//最后一位填入labelNum
-						for (int i = 0; i < outLSTER.getRows(); i++) {
-							in(0, i) = outLSTER(i, 0);
-						}
-						int index = outLSTER.getRows();
-						in(0, index++) = value_NFR;
+						//	STE_size+LPCC+LSP(10)
+						int allFeatureOrder = 1 + 10;
+						in.create(allFeatureOrder, 1);
+						int index = 0;
+						in(index++, 0) = outLSTER(0, 0);
 
-						for (int i = index; i < (index + 10); i++) {
-							in(0, i) = inLPCC(0, i - index);
-						}
-						index += 10;
-						for (int i = index; i < (index + 10); i++) {
-							in(0, i) = inLSP(0, i - index);
+						for(int j = index;j < (index + inLSP.getCols());j++){
+							in(j, 0) = inLSP((100*i+j), j - index);
 						}
 						svmtrain->svmProcess(in, out, SMBsvmModelName, SMBmaxMinFilename);
 						if(out(0) == 0){ //speechmusic
@@ -232,21 +221,14 @@ void recognize(vector<string> soundfiles) {
 						}
 					}
 				}else if(out(0) == 1){ //Non-Speech
-					//	STE_size+NFR(1)+LPCC(10)+LSP(10)
-					int allFeatureOrder = outLSTER.getRows() + 1 + 10 + 10;
-					in.create(1, allFeatureOrder);//最后一位填入labelNum
-					for (int i = 0; i < outLSTER.getRows(); i++) {
-						in(0, i) = outLSTER(i, 0);
-					}
-					int index = outLSTER.getRows();
-					in(0, index++) = value_NFR;
+					//	STE_size+LPCC+LSP(10)
+					int allFeatureOrder = 1 + 10;
+					in.create(allFeatureOrder, 1);
+					int index = 0;
+					in(index++, 0) = outLSTER(0, 0);
 
-					for (int i = index; i < (index + 10); i++) {
-						in(0, i) = inLPCC(0, i - index);
-					}
-					index += 10;
-					for (int i = index; i < (index + 10); i++) {
-						in(0, i) = inLSP(0, i - index);
+					for(int j = index;j < (index + inLSP.getCols());j++){
+						in(j, 0) = inLSP((100*i+j), j - index);
 					}
 					svmtrain->svmProcess(in, out, MBsvmModelName, MBmaxMinFilename);
 					if(out(0) == 0){ //music
@@ -285,7 +267,25 @@ void recognize(vector<string> soundfiles) {
 					audioclass = k;
 				}
 			}
-			cout << i << "s: " <<  audioclass <<endl;
+			string audioclassname;
+			switch(audioclass){
+			case PURESPEECH:
+					audioclassname = "PURESPEECH";
+					break;
+				case SPEECHMUSIC:
+					audioclassname = "SPEECHMUSIC";
+					break;
+				case SPEECHBGD:
+					audioclassname = "SPEECHBGD";
+					break;
+				case MUSIC:
+					audioclassname = "MUSIC";
+					break;
+				case BGD:
+					audioclassname = "BGD";
+					break;
+			}
+			cout << i << "s: " <<  audioclassname <<endl;
 		}
 //		int pos = 0;
 //		int count = 1;
@@ -317,16 +317,10 @@ void initOptions() {
 	cmd_options.addBoolOption("help", "h", false);
 	// 显示用户信息
 	cmd_options.addBoolOption("usage", "u", false);
-	// 设置区分Speech,Non-Speech网络的Plugin文件
-	cmd_options.addStringOption("pluginSN", "psn", EMPTYSTRING);
-	// 设置区分Pure Speech,Non-pure Speech网络的Plugin文件
-	cmd_options.addStringOption("pluginPN", "ppn", EMPTYSTRING);
-	// 设置区分Music,Background Sound网络的Plugin文件
-	cmd_options.addStringOption("pluginMB", "pmb", EMPTYSTRING);
-	// 设置区分Speech With Music,Speech With Background Sound网络的Plugin文件
-	cmd_options.addStringOption("pluginSMB", "psmb", EMPTYSTRING);
-	// 设置识别时是否播放音频文件
-	cmd_options.addBoolOption("pluginMute", "pm", false);
+	// 设置模型目录
+	cmd_options.addStringOption("dic", "d", "./");
+//	// 设置识别时是否播放音频文件
+//	cmd_options.addBoolOption("pluginMute", "pm", false);
 }
 
 void loadOptions() {
@@ -335,8 +329,6 @@ void loadOptions() {
 	// 用户信息
 	usageopt = cmd_options.getBoolOption("usage");
 
-	// 识别时是否播放音频文件
-	pluginMute = cmd_options.getBoolOption("pluginMute");
 }
 
 int main(int argc, const char **argv) {

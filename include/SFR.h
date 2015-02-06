@@ -24,7 +24,7 @@ private:
 public:
 
 	SFR();
-	SFR::SFR(const SFR& a);
+	SFR(const SFR& a);
 
 	~SFR();
 

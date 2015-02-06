@@ -41,7 +41,7 @@ void Spectrum::computeSpectrum(realvec& in, realvec& out) {
 	// copy to output to perform inplace fft 
 	// notice transposition of matrix 
 	// from row to column 
-	int inSamples_ = 512;//?
+	int inSamples_ = 256;//?
 	for (int t = 0; t < inSamples_; t++) {
 		out(t, 0) = in(0, t);
 	}

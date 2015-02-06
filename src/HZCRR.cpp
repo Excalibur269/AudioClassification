@@ -10,7 +10,7 @@
 HZCRR::HZCRR() {
 	// TODO Auto-generated constructor stub
 	avZCR = 0.0;
-	obrow = 1;
+	obrow = 0;
 }
 
 HZCRR::~HZCRR() {

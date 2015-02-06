@@ -93,10 +93,9 @@ SVMClassifier::~SVMClassifier() {
 void SVMClassifier::svmProcess(realvec& in, realvec& out, string modelfile, string maxminfile) {
 	filename_ = modelfile;
 	maxminfile_ = maxminfile;
-	dims = 0;
 	if (mode_ == "train") {
 		if (prev_mode_ == "predict") {
-			dims = in.getCols();
+			dims = in.getRows();
 			instances_.Create(dims);
 		}
 
@@ -107,6 +106,7 @@ void SVMClassifier::svmProcess(realvec& in, realvec& out, string modelfile, stri
 
 	if ((prev_mode_ == "train") && (mode_ == "predict")) {
 
+		dims = instances_.getCols();
 		instances_.NormMaxMin(maxminfile_);
 
 		int nInstances = instances_.getRows();
@@ -141,12 +141,11 @@ void SVMClassifier::svmProcess(realvec& in, realvec& out, string modelfile, stri
 //		const struct svm_model  *svm_model_const= svm_model_;
 		svm_save_model(filename_.c_str(), svm_model_);
 		svm_destroy_model(svm_model_);
-
 	}
 
-	if (mode_ == "predict") {
+	if (mode_ == "predict" && prev_mode_ == "predict") {
 //      int nAttributes = getctrl("int/inObservations")->to<int>();
-		int nAttributes = in.getCols() + 1;
+		int nAttributes = in.getRows() + 1;
 		struct svm_node* xv = new svm_node[nAttributes];
 		/*  cout <<"we are in svmclassifier;mode= predict"<<endl;*/
 

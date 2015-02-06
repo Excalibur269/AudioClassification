@@ -12,7 +12,9 @@
 #include <iostream>
 #include <string>
 #include <math.h>
+#include <stdlib.h>
 #include "realvec.h"
+#include "MyFFT.h"
 class APD {
 private:
 	int N2_;
@@ -25,7 +27,7 @@ private:
 //	void myUpdate(MarControlPtr sender);
 
 public:
-	APD(std::string name);
+	APD();
 	APD(const APD&);
 	~APD();
 //	MarSystem* clone() const;

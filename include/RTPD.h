@@ -8,10 +8,7 @@
 #ifndef INCLUDE_RTPD_H_
 #define INCLUDE_RTPD_H_
 #include <iostream>
-#include "alize.h"
-
-using namespace alize;
-
+#include "realvec.h"
 /************************************************************
 	RPTD是依APD（帧输出）为输入的段特征，对于段的计算不再只是求均
 	值和方差，而是定义tonal-frame（有调帧）和non-tonal-frame（无调

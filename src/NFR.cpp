@@ -8,9 +8,14 @@
 
 using namespace std;
 
-NFR::NFR(string name) {
+NFR::NFR() {
 	this->threshold = 0.003;
 	this->obrow = 0;
+}
+NFR::NFR(const NFR& a){
+}
+
+NFR::~NFR(){
 }
 
 double NFR::computeNFR(realvec& in) {

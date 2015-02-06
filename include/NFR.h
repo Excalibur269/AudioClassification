@@ -9,6 +9,7 @@
 #define INCLUDE_NFRH_
 
 #include <iostream>
+#include "realvec.h"
 
 /**
 	\class Noise frame ratio
@@ -21,8 +22,8 @@ private:
 	double threshold;
 	int obrow;
 public:
-	NFR(std::string name);
-//	NFC(const NFC& nfc);
+	NFR();
+	NFR(const NFR& nfr);
 
 	~NFR();
 	double computeNFR(realvec& in);

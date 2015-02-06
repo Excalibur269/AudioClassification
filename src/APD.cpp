@@ -7,7 +7,7 @@
 #include "APD.h"
 using namespace std;
 
-APD::APD(string name) {
+APD::APD() {
 	re_ = 0.0;
 	im_ = 0.0;
 

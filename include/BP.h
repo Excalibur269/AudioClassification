@@ -10,6 +10,7 @@
 #include <math.h>
 #include <iostream>
 #include "realvec.h"
+#include "Spectrum.h"
 
 class BP {
 public:

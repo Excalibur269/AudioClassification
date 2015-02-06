@@ -26,6 +26,7 @@
 #include <string> 
 #include <map>
 #include <iostream> 
+#include <stdlib.h>
 
 /** 
 \class CommandLineOptions

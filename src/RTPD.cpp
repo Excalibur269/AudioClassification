@@ -6,7 +6,7 @@
  */
 
 #include "RTPD.h"
-using namespae std;
+using namespace std;
 
 RTPD::RTPD() {
 	// TODO Auto-generated constructor stub
@@ -43,4 +43,5 @@ double RTPD::computeRTPD(realvec& in, realvec& out) {
 	else
 		RTPD = (double)(rms_tonal / tonal_num) / (rms_all / memSize);
 	RTPD /= 4.0;
+	return RTPD;
 }

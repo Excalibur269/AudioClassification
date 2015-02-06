@@ -5,12 +5,13 @@
  *      Author: zhangbihong
  */
 #include "ReadFeature.h"
+#include <iostream>
 #include <fstream>
 using namespace std;
 
 void readMFCC(std::string filename, realvec& in) {
 	ifstream readMFCCFile;
-	readMFCCFile.open((filename + "mfc").c_str());
+	readMFCCFile.open((filename + ".mfc").c_str());
 	char line[1024] = { 0 };
 	int row  = 0, col = 0;
 	while(readMFCCFile.getline(line, sizeof(line))){
@@ -25,22 +26,39 @@ void readMFCC(std::string filename, realvec& in) {
 }
 void readLSP(std::string filename, realvec& in) {
 	ifstream readLSPFile;
-	readLSPFile.open((filename + "lsp").c_str());
+	readLSPFile.open((filename + ".lsp").c_str());
 	char line[1024] = { 0 };
-	int col = 0;
+	int row = 0, col = 0;
 	while(readLSPFile.getline(line, sizeof(line))){
 		stringstream word(line);
-		word >> in(0, col++);
+		word >> in(row, col);
+		col++;
+		if(col == 10){
+			col = 0;
+			row++;
+		}
 	}
 }
 void readLPCC(std::string filename, realvec& in) {
 	ifstream readLPCCFile;
 	readLPCCFile.open((filename + ".lpcc").c_str());
 	char line[1024] = { 0 };
-	int col = 0;
+	int row = 0, col = 0;
+	int lines = 0;
+	while (readLPCCFile.getline(line, sizeof(line))) {
+		lines++;
+	}
+	readLPCCFile.close();
+	readLPCCFile.open((filename + ".zcr").c_str());
+	in.create(1, lines);
 	while(readLPCCFile.getline(line, sizeof(line))){
 		stringstream word(line);
 		word >> in(0, col++);
+//		col++;
+//		if(col == 10){
+//			col = 0;
+//			row++;
+//		}
 	}
 }
 

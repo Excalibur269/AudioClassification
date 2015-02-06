@@ -8,7 +8,7 @@ using namespace std;
 //that the data change once it is loaded.
 //
 //It is also assumed that the last column of each row is the class attribute.
-//All data items are mrs_real, including the class attribute, however the class
+//All data items are double, including the class attribute, however the class
 //attribute should be interpreted as an int.
 WekaData::WekaData():cols_(0),rows_(0)
 {
@@ -35,7 +35,7 @@ void WekaData::Create(int cols)
 void WekaData::Clear()
 {
   
-	for(vector<vector<mrs_real>*>::iterator iter = this->begin(); iter!=this->end(); iter++)
+	for(vector<vector<double>*>::iterator iter = this->begin(); iter!=this->end(); iter++)
 	{
 		delete (*iter);
 	}
@@ -44,7 +44,7 @@ void WekaData::Clear()
 
 
 void 
-WekaData::NormMaxMinRow(realvec& in,mrs_string MaxMinFilename)
+WekaData::NormMaxMinRow(realvec& in,string MaxMinFilename)
 {
   int ii;
 
@@ -100,7 +100,7 @@ WekaData::NormMaxMinRow(realvec& in,mrs_string MaxMinFilename)
 }
 
 void 
-WekaData::NormMaxMin(mrs_string MaxMinFilename)
+WekaData::NormMaxMin(string MaxMinFilename)
 {
   minimums_.create(cols_-1);
   maximums_.create(cols_-1);
@@ -108,9 +108,9 @@ WekaData::NormMaxMin(mrs_string MaxMinFilename)
   minimums_.setval(DBL_MAX);
   
   // find minimums_ and maximums_ 
-  for(vector<vector<mrs_real>*>::const_iterator citer = this->begin(); citer!=this->end(); citer++)
+  for(vector<vector<double>*>::const_iterator citer = this->begin(); citer!=this->end(); citer++)
     {
-      const vector<mrs_real> *row = (*citer);
+      const vector<double> *row = (*citer);
       int ii;
       for(ii=0; ii<(int)row->size()-1; ii++)
 	{
@@ -129,9 +129,9 @@ WekaData::NormMaxMin(mrs_string MaxMinFilename)
 /*cout <<"ininininininin"<<endl;*/
 
   // normalize 
-  for(vector<vector<mrs_real>*>::const_iterator citer = this->begin(); citer!=this->end(); citer++)
+  for(vector<vector<double>*>::const_iterator citer = this->begin(); citer!=this->end(); citer++)
     {
-      vector<mrs_real> *row = (*citer);
+      vector<double> *row = (*citer);
       int ii;
       for(ii=0; ii<(int)row->size()-1; ii++)
 	{
@@ -172,7 +172,7 @@ void WekaData::Shuffle()
 	int size = this->size()-1;
 	for (int ii=0; ii<size; ii++)
 	{
-		int rind = (int)(((mrs_real)rand() / (mrs_real)(RAND_MAX))*size);
+		int rind = (int)(((double)rand() / (double)(RAND_MAX))*size);
 		//swap row ii with row rind
 		swapRows(ii, rind);
 	}//for ii
@@ -182,14 +182,14 @@ void WekaData::Shuffle()
 //Just need to swap the 2 vector pointers.
 void WekaData::swapRows(int l, int r)
 {
-	vector<mrs_real> *temp = this->at(l);
+	vector<double> *temp = this->at(l);
 	this->at(l) = this->at(r);
 	this->at(r) = temp;
 }
 
 int WekaData::partition(int attIndex, int l, int r)
 {
-	mrs_real pivot = this->at((l+r)/2)->at(attIndex);
+	double pivot = this->at((l+r)/2)->at(attIndex);
 	while (l < r)
 	{
 		while ((this->at(l)->at(attIndex) < pivot) && (l < r))
@@ -251,7 +251,7 @@ void WekaData::Sort(int attr)
 void WekaData::Append(const realvec& in)
 {
   assert(in.getRows()==cols_);
-  vector<mrs_real> *data = new vector<mrs_real>(cols_);
+  vector<double> *data = new vector<double>(cols_);
   for(int ii=0; ii<in.getRows(); ii++)
     {
       data->at(ii) = in(ii, 0);
@@ -260,7 +260,7 @@ void WekaData::Append(const realvec& in)
 }//Append
 
 //add rows of data to the table
-void WekaData::Append(vector<mrs_real> *data)
+void WekaData::Append(vector<double> *data)
 {
   rows_++;
 	assert(data!=NULL&&data->size()==cols_);
@@ -284,10 +284,10 @@ void WekaData::Dump(const string& filename, const vector<string>& classNames) co
 	mis->open(filename.c_str(), ios_base::out | ios_base::trunc );
 	assert( mis->is_open() );
 
-	for(vector<vector<mrs_real>*>::const_iterator citer = this->begin(); citer!=this->end(); citer++)
+	for(vector<vector<double>*>::const_iterator citer = this->begin(); citer!=this->end(); citer++)
 	{
 		bool first = true;
-		const vector<mrs_real> *row = (*citer);
+		const vector<double> *row = (*citer);
 		int ii;
 		for(ii=0; ii<(int)row->size()-1; ii++)
 		{

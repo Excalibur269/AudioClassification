@@ -2,9 +2,20 @@
 #include <cstdio>
 #include <string> 
 
+#include "HZCRR.h"
+#include "LSTER.h"
+#include "APD.h"
+#include "BP.h"
+#include "NFR.h"
+#include "SFR.h"
+#include "RTPD.h"
+#include "Rms.h"
+#include "STE.h"
+#include "WavRead.h"
 #include "Collection.h"
 #include "CommandLineOptions.h"
-
+#include "ReadFeature.h"
+#include "SVMClassifier.h"
 using namespace std;
 
 int helpopt;
@@ -36,7 +47,7 @@ double start = 0.0;
 double length = -1.0;
 int accSize_ = 40;
 double samplingRate_ = 16000.0;
-
+int framelength = 10;
 #define DEFAULT_EXTRACTOR "STFTMFCC" 
 #define DEFAULT_CLASSIFIER  "SVM"
 
@@ -74,27 +85,27 @@ void train_frame(vector<Collection> cls, Collection cl, string pluginName,
 	SVMClassifier *svmtrain = new SVMClassifier();
 	svmtrain->setMode("train");
 //	WavRead wavread;
-	for (int i = 0; i < l.size(); i++) {
+	for (int k = 0; k < l.size(); k++) {
 		//reset texture analysis stats between files
 		WavRead *wavread = new WavRead();
 		int millisec = 0;
-		string label = l.labelEntry(i);
+		string label = l.labelEntry(k);
 		int labelNum = l.labelNum(label);
-		string filename = l.entry(i);
+		string filename = l.entry(k);
 		wavread->readWavFile(filename.c_str());
 		realvec wavdata, in, out;
 		wavdata.create(1, wavread->DataNum);
-		millisec = wavread->DataNum / samplingRate_;
+		millisec = wavread->DataNum / 16;
 		for (int i = 0; i < wavdata.getSize(); i++) {
 			wavdata(0, i) = wavread->XN[i];
 		}
 
 		realvec inZCR;
-		inZCR.create(1, millisec / framelength);
+//		inZCR.create(1, millisec / framelength);
 		readZCR(filename, inZCR);
 
 		realvec inLSTER, outLSTER;
-		int count = wavdata.getCols() / 160;
+		int count = wavdata.getCols() / 160; //frame numbers
 		if ((wavdata.getCols() % 160) != 0) {
 			count++;
 		}
@@ -103,9 +114,10 @@ void train_frame(vector<Collection> cls, Collection cl, string pluginName,
 		for (int i = 0; i < count; i++) {
 			if (i == count - 1) {
 				for (int j = 160 * i; j < wavdata.getSize(); j++)
-					inLSTER(j - 160 * i) = wavdata(j);
+					inLSTER(i, j - 160 * i) = wavdata(j);
 			} else {
-				inLSTER = wavdata.getSubVector(160 * i, 160);
+				for (int j = 0; j < 160; j++)
+					inLSTER(i, j) = wavdata(160 * i + j);
 			}
 		}
 		outLSTER.create(count, 1);
@@ -115,46 +127,50 @@ void train_frame(vector<Collection> cls, Collection cl, string pluginName,
 		double value_SFR = sfr.computeSFR(outLSTER);
 
 		Rms rms;
-		double value_RMS = rms.computeRms(inLSTER);
+		double value_RMS = rms.computeRms(outLSTER);
 
 		realvec inMFCC;
-		inMFCC.create(millisec / framelength, framelength);
+		inMFCC.create(count, framelength);
 		readMFCC(filename, inMFCC);
 
 		realvec inLSP;
-		inLSP.create(0, 10); //10维LSP
+		inLSP.create(count, framelength); //10维LSP
 		readLSP(filename, inLSP);
 
-		realvec inLPCC;
-		inLPCC.create(0, 10); //10维LSP
-		readLPCC(filename, inLPCC);
+//		realvec inLPCC;
+//		inLPCC.create(millisec/framelength, framelength); //10维LSP
+//		readLPCC(filename, inLPCC);
 
-		//ZCR_size+SFR(1)+RMS(1+LPCC(10)+LSP(10)+MFCC_size
-		int allFeatureOrder = inZCR.getCols() + 1 + 1 + 10 + 10 + inMFCC.getSize();
-		in.create(1, allFeatureOrder + 1);//最后一位填入labelNum
-		for (int i = 0; i < inZCR.getCols(); i++) {
-			in(0, i) = inZCR(0, i);
-		}
-		int index = inZCR.getCols();
-		in(0, index++) = value_SFR;
-		in(0, index++) = value_RMS;
+		//ZCR_size+SFR(1)+RMS(1+LSP_size+MFCC_size
+		int allFeatureOrder = 1 + 1 + 1 + 10 + 13;
+		in.create(allFeatureOrder + 1, 1);//最后一位填入labelNum
 
-		for (int i = index; i < (index + 10); i++) {
-			in(0, i) = inLPCC(0, i - index);
+		in(0, 0) = value_SFR;
+		in(1, 0) = value_RMS;
+		for(int i = 0;i < inLSP.getRows();i++){
+			int index = 2;
+			if(i < inZCR.getCols())
+				in(index++, 0) = inZCR(0, i);
+			else
+				in(index++, 0) = 0;
+			for(int j = index;j < (index + inLSP.getCols());j++){
+				in(j, 0) = inLSP(i, j - index);
+			}
+			index = index + inLSP.getCols();
+			for(int j = index;j < (index + inMFCC.getCols());j++){
+				in(j, 0) = inMFCC(i, j - index);
+			}
+			in(in.getRows() -1, 0) = labelNum; //最后一个填入标注名称数字
+			svmtrain->svmProcess(in, out, svmModelName, maxMinFilename);
 		}
-		index += 10;
-		for (int i = index; i < (index + 10); i++) {
-			in(0, i) = inLSP(0, i - index);
-		}
-		index += 10;
-		for (int i = index; i < (index + inMFCC.getSize()); i++) {
-			in(0, i) = inMFCC(i - index);
-		}
-		in(0, in.getCols() - 1) = labelNum; //最后一个填入标注名称数字
-		svmtrain->svmProcess(in, out, svmModelName, maxMinFilename);
+//		for(int i = index;i < (index + inLPCC.getSize());i++){
+//			in(0,i) = inLPCC(i - index);
+//		}
+//		index = index + inLPCC.getSize();
+
 		//		wc = 0;
 		//		samplesPlayed = 0;
-		cout << "Processed " << l.entry(i) << endl;
+		cout << "Processed " << l.entry(k) << endl;
 		delete wavread;
 	}
 
@@ -617,8 +633,8 @@ int main(int argc, const char **argv) {
 		train_frame(cls, single, pluginName, classNames, wekafname, memSize,
 				extractorName, classifierName);
 	else if (choose == "w")
-		train_window(cls, single, pluginName, classNames, memSize,
-				extractorName, classifierName);
+//		train_window(cls, single, pluginName, classNames, memSize,
+//				extractorName, classifierName);
 
 	return 0;
 }

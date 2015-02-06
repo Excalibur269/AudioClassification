@@ -33,7 +33,7 @@ double Rms::computeRms(realvec& in) {
 	double rmsEnergy = 0.0;
 	double rms = 0;
 
-	int inSamples_ = in.getCols();
+	int inSamples_ = in.getRows();
 	for (int t = 0; t < inSamples_; t++) {
 		val = in(t, 0);
 		rmsEnergy += (val * val);

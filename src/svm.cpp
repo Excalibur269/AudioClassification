@@ -39,7 +39,7 @@
 #include <float.h>
 #include <string.h>
 #include <stdarg.h>
-#include <libsvm/svm.h>
+#include <svm.h>
 typedef float Qfloat;
 typedef signed char schar;
 #ifndef min

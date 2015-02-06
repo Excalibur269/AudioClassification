@@ -38,7 +38,7 @@ WavRead::WavRead() {
 void WavRead::readWavFile(const char *fname) {
 	file = fopen(fname, "rb");
 	if (NULL == file) {
-		printf("open file failer!");
+		printf("open file failer!\n");
 		return;
 	}
 	char byte[5];

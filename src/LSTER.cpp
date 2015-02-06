@@ -7,6 +7,7 @@
 
 #include "LSTER.h"
 
+using namespace std;
 LSTER::LSTER() {
 	// TODO Auto-generated constructor stub
 	av = 0.0;

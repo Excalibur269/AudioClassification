@@ -7,7 +7,9 @@
 #include <cfloat> 
 #include <iostream>
 #include <stdlib.h>
+#include <cstring>
 
+#include "realvec.h"
 //This class represents a collection of row data read from a weka arff file.
 //It is organized as a vector collection of vector pointers.
 //It is optimized for fast sorting and shuffling of the data. It is not intended

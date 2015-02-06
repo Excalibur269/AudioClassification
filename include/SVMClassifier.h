@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include "svm.h" 
 #include "WekaData.h" 
+#include "realvec.h"
 
 /**
 	\class SVMClassifier

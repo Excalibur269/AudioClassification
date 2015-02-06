@@ -2,8 +2,19 @@
 #include <cstdio>
 #include <string> 
 
+#include "HZCRR.h"
+#include "LSTER.h"
+#include "APD.h"
+#include "BP.h"
+#include "NFR.h"
+#include "RTPD.h"
+#include "Rms.h"
+#include "STE.h"
+#include "WavRead.h"
 #include "Collection.h"
 #include "CommandLineOptions.h"
+#include "ReadFeature.h"
+#include "SVMClassifier.h"
 
 using namespace std;
 
@@ -36,7 +47,7 @@ double start = 0.0;
 double length = -1.0;
 int accSize_ = 40;
 double samplingRate_ = 16000.0;
-
+int framelength = 10;
 #define DEFAULT_EXTRACTOR "STFTMFCC"
 #define DEFAULT_CLASSIFIER  "SVM"
 
@@ -74,17 +85,17 @@ void train_frame(vector<Collection> cls, Collection cl, string pluginName,
 	SVMClassifier *svmtrain = new SVMClassifier();
 	svmtrain->setMode("train");
 //	WavRead wavread;
-	for (int i = 0; i < l.size(); i++) {
+	for (int k = 0; k < l.size(); k++) {
 		//reset texture analysis stats between files
 		WavRead *wavread = new WavRead();
 		int millisec = 0;
-		string label = l.labelEntry(i);
+		string label = l.labelEntry(k);
 		int labelNum = l.labelNum(label);
-		string filename = l.entry(i);
+		string filename = l.entry(k);
 		wavread->readWavFile(filename.c_str());
 		realvec wavdata, in, out;
 		wavdata.create(1, wavread->DataNum);
-		millisec = wavread->DataNum / samplingRate_;
+		millisec = wavread->DataNum / 16;
 		for (int i = 0; i < wavdata.getSize(); i++) {
 			wavdata(0, i) = wavread->XN[i];
 		}
@@ -109,44 +120,41 @@ void train_frame(vector<Collection> cls, Collection cl, string pluginName,
 		ShortTimeEnergy ste;
 		ste.computeSTE(inLSTER, outLSTER);
 
-		realvec outBP;
-		outBP.create(4,1);
-		BP bp;
-		bp.computeBP(wavdata, outBP);
-
-		NFR nfr;
-		double value_NFR = nfr.computeNFR(outBP);
+//		realvec outBP;
+//		outBP.create(4,1);
+//		BP bp;
+//		bp.computeBP(wavdata, outBP);
+//		NFR nfr;
+//		double value_NFR = nfr.computeNFR(outBP);
 
 
 		realvec inLSP;
-		inLSP.create(0, 10); //10维LSP
+		inLSP.create(count, framelength); //10维LSP
 		readLSP(filename, inLSP);
 
-		realvec inLPCC;
-		inLPCC.create(0, 10); //10维LSP
-		readLPCC(filename, inLPCC);
+//		realvec inLPCC;
+//		inLPCC.create(millisec/framelength, framelength); //10维LSP
+//		readLPCC(filename, inLPCC);
 
-		//	STE_size+NFR(1)+LPCC(10)+LSP(10)
-		int allFeatureOrder = outLSTER.getRows() + 1 + 10 + 10;
-		in.create(1, allFeatureOrder + 1);//最后一位填入labelNum
-		for (int i = 0; i < outLSTER.getRows(); i++) {
-			in(0, i) = outLSTER(i, 0);
+		//	STE_size+LSP_size
+		int allFeatureOrder = 1 + 10;
+		in.create(allFeatureOrder + 1, 1); //最后一位填入labelNum
+		for(int i = 0;i < inLSP.getRows();i++){
+			int index = 0;
+			if(i < outLSTER.getRows())
+				in(0, index++) = outLSTER(i, 0);
+			else
+				in(0, index++) = 0;
+			for(int j = index;j < (index + inLSP.getCols());j++){
+				in(j, 0) = inLSP(i, j - index);
+			}
+			in(in.getRows() -1, 0) = labelNum; //最后一个填入标注名称数字
+			svmtrain->svmProcess(in, out, svmModelName, maxMinFilename);
 		}
-		int index = outLSTER.getRows();
-		in(0, index++) = value_NFR;
 
-		for (int i = index; i < (index + 10); i++) {
-			in(0, i) = inLPCC(0, i - index);
-		}
-		index += 10;
-		for (int i = index; i < (index + 10); i++) {
-			in(0, i) = inLSP(0, i - index);
-		}
-		in(0, in.getCols() - 1) = labelNum; //最后一个填入标注名称数字
-		svmtrain->svmProcess(in, out, svmModelName, maxMinFilename);
 		//		wc = 0;
 		//		samplesPlayed = 0;
-		cout << "Processed " << l.entry(i) << endl;
+		cout << "Processed " << l.entry(k) << endl;
 		delete wavread;
 	}
 
@@ -609,8 +617,8 @@ int main(int argc, const char **argv) {
 		train_frame(cls, single, pluginName, classNames, wekafname, memSize,
 				extractorName, classifierName);
 	else if (choose == "w")
-		train_window(cls, single, pluginName, classNames, memSize,
-				extractorName, classifierName);
+//		train_window(cls, single, pluginName, classNames, memSize,
+//				extractorName, classifierName);
 
 	return 0;
 }

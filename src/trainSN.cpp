@@ -4,12 +4,21 @@
 #include <string> 
 #include <iostream>
 #include <map>
+#include <stdlib.h>
 
+#include "HZCRR.h"
+#include "LSTER.h"
+#include "APD.h"
+#include "BP.h"
+#include "NFR.h"
+#include "RTPD.h"
+#include "Rms.h"
 #include "STE.h"
 #include "WavRead.h"
 #include "Collection.h"
 #include "CommandLineOptions.h"
 #include "ReadFeature.h"
+#include "SVMClassifier.h"
 
 using namespace std;
 
@@ -88,27 +97,31 @@ void train_frame(vector<Collection> cls, Collection cl, string pluginName,
 	SVMClassifier *svmtrain = new SVMClassifier();
 	svmtrain->setMode("train");
 //	WavRead wavread;/
-	for (int i = 0; i < l.size(); i++) {
+	for (int k = 0; k < l.size(); k++) {
 		//reset texture analysis stats between files
+		cout << "Processed " << l.entry(k) << endl;
+		cout << "start read wav" << endl;
 		WavRead *wavread = new WavRead();
 		int millisec = 0;
-		string label = l.labelEntry(i);
+		string label = l.labelEntry(k);
 		int labelNum = l.labelNum(label);
-		string filename = l.entry(i);
+		string filename = l.entry(k);
 		wavread->readWavFile(filename.c_str());
 		realvec wavdata, in, out;
 		wavdata.create(1, wavread->DataNum);
-		millisec = wavread->DataNum / samplingRate_;
+		millisec = wavread->DataNum / 16;
 		for(int i = 0;i < wavdata.getSize();i++){
 			wavdata(0, i) = wavread->XN[i];
 		}
 
+		cout << "start compute HZCRR" << endl;
 		realvec inZCR;
-		inZCR.create(1,millisec/framelength);
+//		inZCR.create(1,millisec/framelength);
 		readZCR(filename, inZCR);
 		HZCRR hzcrr;
 		double value_HZCRR = hzcrr.computeHZCRR(inZCR);
 
+		cout << "start compute LSTER" << endl;
 		realvec inLSTER, outLSTER;
 		int count = wavdata.getCols() / 160; //1帧10ms
 		if((wavdata.getCols() % 160) != 0){
@@ -116,12 +129,13 @@ void train_frame(vector<Collection> cls, Collection cl, string pluginName,
 		}
 		inLSTER.create(count, 160);
 		inLSTER.setval(0);
-		for(int i = 0;i < count;i++){
-			if(i == count - 1){
-				for(int j = 160 * i; j < wavdata.getSize();j++)
-					inLSTER(j - 160 * i) = wavdata(j);
-			}else{
-				inLSTER = wavdata.getSubVector(160 * i, 160);
+		for (int i = 0; i < count; i++) {
+			if (i == count - 1) {
+				for (int j = 160 * i; j < wavdata.getSize(); j++)
+					inLSTER(i, j - 160 * i) = wavdata(j);
+			} else {
+				for (int j = 0; j < 160; j++)
+					inLSTER(i, j) = wavdata(160 * i + j);
 			}
 		}
 		outLSTER.create(count, 1);
@@ -129,55 +143,64 @@ void train_frame(vector<Collection> cls, Collection cl, string pluginName,
 		ste.computeSTE(inLSTER, outLSTER);
 		LSTER lster;
 		double value_LSTER = lster.computeLSTER(outLSTER);
-
+		cout << "start compute RMS" << endl;
 		Rms rms;
-		double value_RMS = rms.computeRms(inLSTER);
+		double value_RMS = rms.computeRms(outLSTER);
 
-		realvec outBP;
-		outBP.create(4,1);
-		BP bp;
-		bp.computeBP(wavdata, outBP);
+//		cout << "start compute BP" << endl;
+//		realvec outBP;
+//		outBP.create(4,1);
+//		BP bp;
+//		bp.computeBP(wavdata, outBP);
+//		cout << "start compute NFR" << endl;
+//		NFR nfr;
+//		double value_NFR = nfr.computeNFR(outBP);
 
-		NFR nfr;
-		double value_NFR = nfr.computeNFR(outBP);
-
+		cout << "read MFCCfile" << endl;
 		realvec inMFCC;
-		inMFCC.create(millisec/framelength, framelength);
+		inMFCC.create(count, 13); //13维MFCC
 		readMFCC(filename, inMFCC);
 
+		cout << "read LSPfile" << endl;
 		realvec inLSP;
-		inLSP.create(0, 10); //10维LSP
+		inLSP.create(count, framelength); //10维LSP
 		readLSP(filename, inLSP);
 
-		realvec inLPCC;
-		inLPCC.create(0, 10); //10维LSP
-		readLPCC(filename, inLPCC);
+//		cout << "read LPCCfile" << endl;
+//		realvec inLPCC;
+//		inLPCC.create(millisec/framelength + 1, framelength); //10维LSP
+//		readLPCC(filename, inLPCC);
 
-		//HZCRR(1)+LSTER(1)+RMS(1)+BP(4)+NFR(1)+LPCC(10)+LSP(10)+MFCC_size
-		int allFeatureOrder = 1 + 1 + 1 + 4 + 1 + 10 + 10 + inMFCC.getSize();
-		in.create(1, allFeatureOrder + 1); //最后一位填入labelNum
+		//HZCRR(1)+LSTER(1)+RMS(1)+LPCC_size+LSP_size+MFCC_size
+//		int allFeatureOrder = 1 + 1 + 1 + inLPCC.getSize() + inLSP.getSize() + inMFCC.getSize();
+		int allFeatureOrder = 1 + 1 + 1 + 10 + 13;
+		in.create(allFeatureOrder + 1, 1); //最后一位填入labelNum
 		in(0,0) = value_HZCRR;
-		in(0,1) = value_LSTER;
-		in(0,2) = value_RMS;
+		in(1,0) = value_LSTER;
+		in(2,0) = value_RMS;
+		for(int i = 0;i < inLSP.getRows();i++){
+			int index = 3;
+			for(int j = index;j < (index + inLSP.getCols());j++){
+				in(j, 0) = inLSP(i, j - index);
+			}
+			index = index + inLSP.getCols();
+			for(int j = index;j < (index + inMFCC.getCols());j++){
+				in(j, 0) = inMFCC(i, j - index);
+			}
+			in(in.getRows() -1, 0) = labelNum; //最后一个填入标注名称数字
+			svmtrain->svmProcess(in, out, svmModelName, maxMinFilename);
+		}
+//		for(int i = 3;i < (3 + 4);i++){
+//			in(0, i) = outBP(0, i - 3);
+//		}
+//		in (0,7) = value_NFR;
 
-		for(int i = 3;i < (3 + 4);i++){
-			in(0, i) = outBP(0, i - 3);
-		}
-		in (0,7) = value_NFR;
-		for(int i = 8;i < (8 + 10);i++){
-			in(0,i) = inLPCC(0, i - 8);
-		}
-		for(int i = 18;i < (18 + 10);i++){
-			in(0,i) = inLSP(0, i - 18);
-		}
-		for(int i = 28;i < (28 + inMFCC.getSize());i++){
-			in(0,i) = inMFCC(i - 28);
-		}
-		in(0, in.getCols() -1 ) = labelNum; //最后一个填入标注名称数字
-		svmtrain->svmProcess(in, out, svmModelName, maxMinFilename);
+//		for(int i = index;i < (index + inLPCC.getSize());i++){
+//			in(0,i) = inLPCC(i - index);
+//		}
+//		index = index + inLPCC.getSize();
 //		wc = 0;
 //		samplesPlayed = 0;
-		cout << "Processed " << l.entry(i) << endl;
 		delete wavread;
 	}
 
@@ -325,29 +348,29 @@ void train_frame(vector<Collection> cls, Collection cl, string pluginName,
 ///*
 // *读取文件
 // */
-//void readCollection(Collection& l, string name) {
-//	MRSDIAG("sfplay.cpp - readCollection");
-//	ifstream from1(name.c_str());
-//	int attempts = 0;
-//
-//	MRSDIAG("Trying current working directory: " + name);
-//	if (from1.good() == false) {
-//		attempts++;
-//	} else {
-//		from1 >> l;
-//		l.setName(name.substr(0, name.rfind(".", name.length())));
-//	}
-//
-//	if (attempts == 1) {
-//		string warn;
-//		warn += "Problem reading collection ";
-//		warn += name;
-//		warn +=
-//				" - tried both default mf directory and current working directory";
-//		MRSWARN(warn);
-//		exit(1);
-//	}
-//}
+void readCollection(Collection& l, string name) {
+	cout << "sfplay.cpp - readCollection" << endl;;
+	ifstream from1(name.c_str());
+	int attempts = 0;
+
+	MRSDIAG("Trying current working directory: " + name);
+	if (from1.good() == false) {
+		attempts++;
+	} else {
+		from1 >> l;
+		l.setName(name.substr(0, name.rfind(".", name.length())));
+	}
+
+	if (attempts == 1) {
+		string warn;
+		warn += "Problem reading collection ";
+		warn += name;
+		warn +=
+				" - tried both default mf directory and current working directory";
+		cerr << warn << endl;;
+		exit(1);
+	}
+}
 
 /*
  *添加相应的选项信息，并初始化
@@ -403,18 +426,12 @@ void loadOptions() {
 	winSize = cmd_options.getNaturalOption("nwinsamples");
 	// 每次移入的采样点数，每次实际处理的采样点数，默认为512
 	hopSize = cmd_options.getNaturalOption("nhopsamples");
-	// 特征
-	extractorName = cmd_options.getStringOption("extractor");
 	// 被确定为静音帧的阈值，默认为0.01
 	slThreshold = cmd_options.getRealOption("slthreshold");
 	// 静音帧数目阈值，默认为20
 	numThreshold = cmd_options.getNaturalOption("numThreshold");
 	// 被确定为噪音帧的阈值，默认为0.003
 	nfrThreshold = cmd_options.getRealOption("nfrThreshold");
-	// 分类器，默认为高斯混合模型分类器(-cl GS)
-	classifierName = cmd_options.getStringOption("classifier");
-	// K近邻分类器中的k值，默认为3
-	k = cmd_options.getNaturalOption("k");
 	// SVM核函数，0：线性，1：RBF，2：POLY，3：SIGMOID
 	kernelType = cmd_options.getNaturalOption("kernelType");
 	// SVM 模型文件名
@@ -423,10 +440,6 @@ void loadOptions() {
 	maxMinFilename = cmd_options.getStringOption("maxmin");
 	// 决策方式，默认为f
 	choose = cmd_options.getStringOption("frame_window");
-	// 要输出的插件文件名(存放分类网络)
-	pluginName = cmd_options.getStringOption("plugin");
-	// 分类时是否播放文件,有此选项不播放，默认为播放
-	pluginMute = cmd_options.getBoolOption("pluginmute");
 }
 
 /*
@@ -453,34 +466,21 @@ void printHelp(string progName) {
 	cerr << "Usage : " << progName << "[-c collection] file1 file2 file3"
 			<< endl;
 	cerr << endl;
-	cerr
-			<< "where file1, ..., fileN are sound files in a Marsyas supported format"
-			<< endl;
 	cerr << "Help Options:" << endl;
 	cerr << "-u --usage		: 显示帮助信息(false)" << endl;
 	cerr << "-h --help		: 显示用法信息(false)" << endl;
 	cerr << "-m --memory		: 设置段大小(40)" << endl;
 	cerr << "-ws --nwinsamples	: 设置每帧的采样点数(512)" << endl;
 	cerr << "-hp --nhopsamples	: 设置实际处理的采样点数(512)" << endl;
-	cerr << "-e --extractor		: 选择特征(BPSTFTMFCC)" << endl;
 	cerr << "-sth --slthreshold	: 设置被确定为静音帧的阈值(0.01)" << endl;
 	cerr << "-nth --numthreshold	: 设置静音帧数目阈值(20)" << endl;
 	cerr << "-nfrth --nfrthreshold	: 设置被确定为噪音帧的阈值(0.003)" << endl;
-	cerr << "-cl --classifier	: 选择分类器(GS)" << endl;
-	cerr << "-k --k			: K近邻分类器中的k值(3)" << endl;
 	cerr << "-ktp --kernel type	: SVM核函数(0)" << endl;
 	cerr << "-mdl --SVM model name	:SVM模型文件名" << endl;
 	cerr << "-mm --SVM maxmin name	:SVM maxmin文件名" << endl;
 	cerr << "-fw --method		：选择决策方式(f)" << endl;
-	cerr << "-p --plugin		: 输出plugin文件名(NULL)" << endl;
-	cerr << "-pm --pluginmute	: 分类时是否播放文件(false)" << endl;
+//	cerr << "-pm --pluginmute	: 分类时是否播放文件(false)" << endl;
 
-	cerr << "---------------------------附注----------------------------" << endl;
-	cerr << "可支持的分类器:GS,KNN,SVM" << endl;
-	cerr << "SVM核函数:0-线性 1-RBF 2-POLY 3-SIGMOID" << endl;
-	cerr << "-----------------------------------------------------------"
-			<< endl;
-	cerr << "可支持的特征组: " << endl;
 	cerr << endl;
 }
 
@@ -545,8 +545,8 @@ int main(int argc, const char **argv) {
 		train_frame(cls, single, pluginName, classNames, wekafname, memSize,
 				extractorName, classifierName);
 	else if (choose == "w")
-		train_window(cls, single, pluginName, classNames, memSize,
-				extractorName, classifierName);
+//		train_window(cls, single, pluginName, classNames, memSize,
+//				extractorName, classifierName);
 
 	return 0;
 }

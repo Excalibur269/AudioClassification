@@ -30,7 +30,7 @@ void BP::computeBP(realvec& in, realvec& out) {
 	int count = length / 256;
 	if((length % 256) != 0)
 		count = count + 1;
-	outSpectrum.create(count * 256);
+	outSpectrum.create(count * 256, 1);
 	outSpectrum.setval(0);
 	for(int i = 0;i < count;i++){
 		if(i == count - 1){
@@ -38,7 +38,7 @@ void BP::computeBP(realvec& in, realvec& out) {
 				tempIn(j - 256 * i) = in(j);
 		}else{
 			tempIn = in.getSubVector(256 * i, 256);
-			tempOut.create(256);
+			tempOut.create(256, 1);
 			spectrum.computeSpectrum(tempIn, tempOut);
 			outSpectrum.appendRealvec(tempOut);
 		}
@@ -79,7 +79,7 @@ void BP::computeBP(realvec& in, realvec& out) {
 		tmp_rss.create(2 * (HighIndex - LowIndex) - 1);	// 自相关序列
 
 		for (int j = LowIndex; j < HighIndex; j++)
-			tmp_fftabs(j - LowIndex) = tempOut(j, 0);
+			tmp_fftabs(j - LowIndex) = outSpectrum(j, 0);
 //			tmp_fftabs(j - LowIndex) = in(j, 0);
 		// 求自相关序列
 		Rxy(tmp_fftabs, (HighIndex - LowIndex), tmp_fftabs,

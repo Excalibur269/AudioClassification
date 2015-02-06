@@ -20,6 +20,7 @@
 #define MARSYAS_RMS_H
 
 #include <math.h>
+#include "realvec.h"
 
 /** 
  \class Rms

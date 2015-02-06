@@ -8,6 +8,7 @@
 
 #include <iostream>
 #include <math.h>
+#include "realvec.h"
 
 
 class ShortTimeEnergy

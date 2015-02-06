@@ -20,6 +20,7 @@
 #define MARSYAS_SPECTRUM_H
 
 #include "fft.h"
+#include "realvec.h"
 
 /** 
     \class Spectrum
@@ -60,7 +61,6 @@ public:
   void computeSpectrum(realvec& in, realvec& out);
 };
 
-}//namespace Marsyas
 
 #endif
 

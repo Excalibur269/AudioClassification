@@ -7,7 +7,8 @@
 
 #ifndef INCLUDE_LSTER_H_
 #define INCLUDE_LSTER_H_
-
+#include <iostream>
+#include "realvec.h"
 class LSTER {
 public:
 	LSTER();

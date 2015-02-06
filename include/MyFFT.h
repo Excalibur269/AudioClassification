@@ -5,6 +5,8 @@
 
 #include <math.h>
 #include <iostream>
+#include <stdlib.h>
+#include <stdio.h>
 
 #ifndef MARSYAS_MYFFT_H 
 #define MARSYAS_MYFFT_H
